@@ -1,0 +1,14 @@
+25 Nov 2012:
+* Actually uploaded the fix (wtf workshopper)
+
+17 Nov 2012:
+* Fixed all errors
+* Ropes should always appear at hands now
+* Increased movement speed of the parachute
+* Cameras now work!
+
+25 Oct 2012:
+* Added a custom spectate system which should fix all HUD bugs and the like
+* Fixed being invincible after exiting ragdollmode
+* Fixed being thrown into air after exiting ragdollmode
+* Damage applied to the ragdoll is now being applied to the player instead. Toggle with "para_godwhilepara 1/0" (1 by default)
