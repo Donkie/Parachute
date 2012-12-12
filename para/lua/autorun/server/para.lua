@@ -3,24 +3,25 @@ if not SERVER then return end
 
 AddCSLuaFile("autorun/client/para.lua")
 
-PARA_MODEL = "models/parachute/chute.mdl" // Model path
-PARA_ANCHORS = {
-	{paravec = Vector(-120,30,0), ragdollbone = "ValveBiped.Bip01_L_Hand", ragdollvec = Vector(0,0,0), length = 200}, // 5 7 5 7
+parachute = {}
+parachute.paramodel = "models/parachute/chute.mdl" // Model path
+parachute.ropeanchors = {
+	{paravec = Vector(-120,30,0), ragdollbone = "ValveBiped.Bip01_L_Hand", ragdollvec = Vector(0,0,0), length = 200},
 	{paravec = Vector(120,30,0), ragdollbone = "ValveBiped.Bip01_R_Hand", ragdollvec = Vector(0,0,0), length = 200},
 	{paravec = Vector(-120,-30,0), ragdollbone = "ValveBiped.Bip01_L_Hand", ragdollvec = Vector(0,0,0), length = 200},
 	{paravec = Vector(120,-30,0), ragdollbone = "ValveBiped.Bip01_R_Hand", ragdollvec = Vector(0,0,0), length = 200}
 } // Anchor points between parachute, ragdoll, ragdollbone and its length
 
-PARA_UNPARASOUND = Sound("npc/combine_soldier/zipline_clip1.wav")
-PARA_PARASOUND = Sound("ambient/fire/mtov_flame2.wav")
+parachute.unparasound = Sound("npc/combine_soldier/zipline_clip1.wav")
+parachute.parasound = Sound("ambient/fire/mtov_flame2.wav")
 
 local godwhilepara = CreateConVar( "para_godwhilepara", "1", { FCVAR_REPLICATED, FCVAR_ARCHIVE } )
 
 /*
 Player parachuting
 */
-function DeployParachute(ply)
-	if not IsValid(ply.pararag) then
+function parachute.DeployParachute(ply)
+	if not IsValid(ply.parachuteragdoll) then
 		// Spawn ragdoll n' shit
 		local plyphys = ply:GetPhysicsObject()
 		local plyvel = Vector(0,0,0)
@@ -36,65 +37,77 @@ function DeployParachute(ply)
 		
 		if not IsValid(rag:GetPhysicsObject()) then
 			ply:PrintMessage(HUD_PRINTTALK, "An error occured! Please try change player model and try again!")
-			rag:Remove()
-			error("An error occured when trying to create the ragdoll\nModel: "..ply:GetModel())
+			SafeRemoveEntity(rag)
 			return
 		end
 		
 			rag:GetPhysicsObject():SetVelocity(plyvel)
 		
-		for _,wep in pairs(ply:GetWeapons()) do
-			wep:SetNextPrimaryFire(CurTime() + 99999)
-			wep:SetNextSecondaryFire(CurTime() + 99999)
-		end
-		ply:DrawViewModel(false)
-		
-		ply:SetMoveType(MOVETYPE_NOCLIP)
-		ply:SetColor(Color(255,255,255,0))
-		ply:SetRenderMode( 1 )
-		
-		umsg.Start("StartRagCam", ply)
-			umsg.Entity(rag)
-		umsg.End()
-		
-		ply.pararag = rag
-		rag.paraply = ply
-		
-		ply:EmitSound(PARA_PARASOUND, 100, 100)
 		
 		// Spawn parachute n' shit
 		local para = ents.Create("prop_physics")
-			para:SetModel(PARA_MODEL)
+			para:SetModel(parachute.paramodel)
 			para:SetPos(ply:GetPos() + Vector(0,0,150))
 			para:SetAngles(Angle(0,ply:GetAngles().y,0))
 			para:Spawn()
 			para:Activate()
 		
 		para.ropes = {}
-		for _,ropetbl in pairs(PARA_ANCHORS) do
+		for _,ropetbl in pairs(parachute.ropeanchors) do
 			local bone = rag:TranslateBoneToPhysBone( rag:LookupBone( ropetbl.ragdollbone ) )
 			if bone != -1 then
 				local ent, const = constraint.Rope(para, rag, 0, bone, ropetbl.paravec, ropetbl.ragdollvec, ropetbl.length, 0, 0, 2, "cable/rope", 0)
 				table.insert(para.ropes, ent)
 			end
 		end
-		ply.parapara = para
-		para.paraply = ply
+		//No ropes created, fucked up physbones
+		if #para.ropes == 0 then
+			ply:PrintMessage(HUD_PRINTTALK, "An error occured! Please try change player model and try again!")
+			SafeRemoveEntity(rag)
+			SafeRemoveEntity(para)
+			return
+		end
+		
+		//Stop firing of weapons
+		for _,wep in pairs(ply:GetWeapons()) do
+			wep:SetNextPrimaryFire(CurTime() + 99999)
+			wep:SetNextSecondaryFire(CurTime() + 99999)
+		end
+		//Dont draw viewmodel
+		ply:DrawViewModel(false)
+		
+		//Set player to noclip and make him invisiblu
+		ply:SetMoveType(MOVETYPE_NOCLIP)
+		ply:SetColor(Color(255,255,255,0))
+		ply:SetRenderMode( 1 )
+		
+		//Start 3dperson
+		umsg.Start("StartRagCam", ply)
+			umsg.Entity(rag)
+		umsg.End()
+		
+		//Play sound
+		ply:EmitSound(parachute.parasound, 100, 100)
+		
+		ply.parachuteragdoll = rag
+		ply.parachute = para
+		para.parachuteowner = ply
+		rag.parachuteowner = ply
 	end
 end
-concommand.Add("para_act", DeployParachute, ply)
+concommand.Add("para_act", function(ply) parachute.DeployParachute(ply) end)
 
-function RemoveParachute(ply)
-	if IsValid(ply.pararag) then
+function parachute.RemoveParachute(ply)
+	if IsValid(ply.parachuteragdoll) then
 		ply:SetMoveType(MOVETYPE_WALK)
 		ply:SetColor(Color(255,255,255,255))
 		ply:SetRenderMode( 10 )
-		ply:SetPos(ply.pararag:GetPos())
-		ply:GetPhysicsObject():SetVelocity(ply.pararag:GetPhysicsObject():GetVelocity())
+		ply:SetPos(ply.parachuteragdoll:GetPos())
+		ply:GetPhysicsObject():SetVelocity(ply.parachuteragdoll:GetPhysicsObject():GetVelocity())
 		
-		if IsValid(ply.parapara) then
-			for _,rope in pairs(ply.parapara.ropes) do
-				rope:Remove() // Proper removal
+		if IsValid(ply.parachute) then
+			for _,rope in pairs(ply.parachute.ropes) do
+				SafeRemoveEntity(rope) // Proper removal
 			end
 		end
 		
@@ -106,14 +119,14 @@ function RemoveParachute(ply)
 		end)
 		ply:DrawViewModel(true)
 		
-		ply.pararag:Remove()
-		ply.parapara:Remove()
+		SafeRemoveEntity(ply.parachuteragdoll)
+		SafeRemoveEntity(ply.parachute)
 		
 		umsg.Start("EndRagCam", ply)
 		umsg.End()
 		
 		timer.Simple(.5,function()
-			ply:EmitSound(PARA_UNPARASOUND, 100, 100)
+			ply:EmitSound(parachute.unparasound, 100, 100)
 		end)
 	end
 end
@@ -121,18 +134,19 @@ end
 local speed = 700
 hook.Add("Think", "Parachutes_think", function()
 	for _,ply in pairs(player.GetAll()) do
-		if IsValid(ply.pararag) then
+		if IsValid(ply.parachuteragdoll) then
 			for _,wep in pairs(ply:GetWeapons()) do
 				wep:SetNextPrimaryFire(CurTime() + 99999)
 				wep:SetNextSecondaryFire(CurTime() + 99999)
 			end
+			ply:DrawViewModel(false)
 			
 			local forward = ply:EyeAngles():Forward()
 			forward.z = 0
 			if ply:KeyDown(IN_FORWARD) then
-				ply.pararag:GetPhysicsObject():ApplyForceCenter(forward * speed)
+				ply.parachuteragdoll:GetPhysicsObject():ApplyForceCenter(forward * speed)
 			elseif ply:KeyDown(IN_BACK) then
-				ply.pararag:GetPhysicsObject():ApplyForceCenter(forward * speed * -1)
+				ply.parachuteragdoll:GetPhysicsObject():ApplyForceCenter(forward * speed * -1)
 			end
 		end
 	end
@@ -142,20 +156,19 @@ end)
 hook.Add("EntityTakeDamage", "Parachutes_enttakedmg", function(targ, dmginfo)
 	local attacker = dmginfo:GetAttacker()
 	local inf = dmginfo:GetInflictor()
-	local dmg = dmginfo:GetDamage()
 	
 	if not godwhilepara:GetBool() then
-		if IsValid(targ.paraply) then
+		if IsValid(targ.parachuteowner) then
 			print(attacker, inf)
-			targ.paraply:TakeDamage( dmg, attacker, inf )
+			targ.parachuteowner:TakeDamage( dmginfo:GetDamage(), attacker, inf )
 		end
 	end
 end)
 
 // This is to fix the player's body which will otherwise spawn somewhere else
 hook.Add("DoPlayerDeath", "Parachutes_doplydeath", function(ply, attacker, dmginfo)
-	if IsValid(ply.pararag) then
-		ply:SetPos(ply.pararag:GetPos())
+	if IsValid(ply.parachuteragdoll) then
+		ply:SetPos(ply.parachuteragdoll:GetPos())
 	end
 end)
 
@@ -163,8 +176,8 @@ end)
 Remove parachute when mouseclick
 */
 hook.Add("KeyPress", "Parachutes_keypress", function(ply, key)
-	if key == IN_ATTACK and IsValid(ply.pararag) then
-		RemoveParachute(ply)
+	if key == IN_ATTACK and IsValid(ply.parachuteragdoll) then
+		parachute.RemoveParachute(ply)
 	end
 end)
 
@@ -172,7 +185,7 @@ end)
 Disallow tools on parachute or ragdoll
 */
 hook.Add("CanTool", "Parachutes_cantool", function(ply, tr, tool)
-	if IsValid(tr.Entity) and (IsValid(tr.Entity.paraply) or tr.Entity.isparachute) then
+	if IsValid(tr.Entity) and (IsValid(tr.Entity.parachuteowner) or tr.Entity.isparachute) then
 		return false
 	end
 end)
@@ -181,7 +194,7 @@ end)
 Disallow physgun on parachute or ragdoll
 */
 hook.Add("PhysgunPickup", "Parachutes_physpick", function(ply, ent)
-	if IsValid(ent.paraply) or ent.isparachute then
+	if IsValid(ent.parachuteowner) or ent.isparachute then
 		return false
 	end
 end)
@@ -190,14 +203,12 @@ end)
 Reset shit if he dies
 */
 hook.Add("PlayerDeath", "Parachutes_plydead", function(ply)
-	if IsValid(ply.pararag) then
+	if IsValid(ply.parachuteragdoll) then
 		ply:SetMoveType(MOVETYPE_WALK)
 		ply:SetColor(Color(255,255,255,255))
 		ply:SetRenderMode( 10 )
-		ply.pararag:Remove()
-		if IsValid(ply.parapara) then
-			ply.parapara:Remove()
-		end
+		SafeRemoveEntity(ply.parachuteragdoll)
+		SafeRemoveEntity(ply.parachute)
 		umsg.Start("EndRagCam", ply)
 		umsg.End()
 	end
@@ -207,9 +218,9 @@ end)
 Reset shit if he disconnects
 */
 hook.Add("PlayerDisconnected", "Parachutes_plydisc", function(ply)
-	if IsValid(ply.pararag) then
-		ply.pararag:Remove()
-		ply.parapara:Remove()
+	if IsValid(ply.parachuteragdoll) then
+		SafeRemoveEntity(ply.parachuteragdoll)
+		SafeRemoveEntity(ply.parachute)
 	end
 end)
 
@@ -234,9 +245,9 @@ local function Allowed(ply, ent)
 		return ent:CPPICanPhysgun(ply)
 	end
 	
-	return ent:GetModel() != PARA_MODEL // Disallow parachuting parachutes.
+	return ent:GetModel() != parachute.paramodel // Disallow parachuting parachutes.
 end
-function DeployParachute_ent(ply, ent, loc)
+function parachute.DeployParachute_ent(ply, ent, loc)
 	if not Allowed(ply, ent) then return false end
 	if IsValid(ent.para) then return end
 	
@@ -249,7 +260,7 @@ function DeployParachute_ent(ply, ent, loc)
 	local p = ent:GetPos()
 	p.z = max.z + 150
 	local para = ents.Create("prop_physics")
-		para:SetModel(PARA_MODEL)
+		para:SetModel(parachute.paramodel)
 		para:SetPos( p )
 		para:SetAngles(Angle(0,0,0))
 		para:Spawn()
@@ -258,7 +269,7 @@ function DeployParachute_ent(ply, ent, loc)
 		
 	
 	para.ropes = {}
-	for _,ropetbl in pairs(PARA_ANCHORS) do
+	for _,ropetbl in pairs(parachute.ropeanchors) do
 		local ent, const = constraint.Rope(para, ent, 0, 0, ropetbl.paravec, localvec, ropetbl.length, 0, 0, 2, "cable/rope", 0)
 		table.insert(para.ropes, ent)
 	end
@@ -268,14 +279,13 @@ function DeployParachute_ent(ply, ent, loc)
 	
 	if IsValid(ent:GetPhysicsObject()) then
 		ent.oldmass = ent:GetPhysicsObject():GetMass()
+		ent:GetPhysicsObject():SetMass( 20 ) // Mass needs to be low, otherwise the parachute does jackshit
 	end
-	
-	ent:GetPhysicsObject():SetMass( 20 ) // Mass needs to be low, otherwise the parachute does jackshit
 	
 	return true
 end
 
-function RemoveParachute_ent(ply, ent)
+function parachute.RemoveParachute_ent(ply, ent)
 	if not Allowed(ply, ent) then return false end
 	
 	local e = nil
@@ -289,10 +299,10 @@ function RemoveParachute_ent(ply, ent)
 	if not IsValid(e.para) then return end
 	
 	for _,rope in pairs(e.para.ropes) do
-		rope:Remove() // Proper removal
+		SafeRemoveEntity(rope) // Proper removal
 	end
 	
-	e.para:Remove()
+	SafeRemoveEntity(e.para)
 	
 	if IsValid(ent:GetPhysicsObject()) then
 		e:GetPhysicsObject():SetMass( e.oldmass or 10 )
@@ -303,7 +313,7 @@ end
 
 hook.Add("EntityRemoved", "Parachutes_entremoved", function(ent)
 	if IsValid(ent.para) then
-		ent.para:Remove()
+		SafeRemoveEntity(ent.para)
 	end
 end)
 
