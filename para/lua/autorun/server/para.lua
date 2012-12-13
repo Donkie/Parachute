@@ -20,7 +20,7 @@ local godwhilepara = CreateConVar( "para_godwhilepara", "1", { FCVAR_REPLICATED,
 /*
 Player parachuting
 */
-function parachute.DeployParachute(ply)
+function parachute.DeployRagdoll(ply)
 	if not IsValid(ply.parachuteragdoll) then
 		// Spawn ragdoll n' shit
 		local plyphys = ply:GetPhysicsObject()
@@ -42,37 +42,13 @@ function parachute.DeployParachute(ply)
 		end
 		
 			rag:GetPhysicsObject():SetVelocity(plyvel)
-		
-		
-		// Spawn parachute n' shit
-		local para = ents.Create("prop_physics")
-			para:SetModel(parachute.paramodel)
-			para:SetPos(ply:GetPos() + Vector(0,0,150))
-			para:SetAngles(Angle(0,ply:GetAngles().y,0))
-			para:Spawn()
-			para:Activate()
-		
-		para.ropes = {}
-		for _,ropetbl in pairs(parachute.ropeanchors) do
-			local bone = rag:TranslateBoneToPhysBone( rag:LookupBone( ropetbl.ragdollbone ) )
-			if bone != -1 then
-				local ent, const = constraint.Rope(para, rag, 0, bone, ropetbl.paravec, ropetbl.ragdollvec, ropetbl.length, 0, 0, 2, "cable/rope", 0)
-				table.insert(para.ropes, ent)
-			end
-		end
-		//No ropes created, fucked up physbones
-		if #para.ropes == 0 then
-			ply:PrintMessage(HUD_PRINTTALK, "An error occured! Please try change player model and try again!")
-			SafeRemoveEntity(rag)
-			SafeRemoveEntity(para)
-			return
-		end
-		
+			
 		//Stop firing of weapons
 		for _,wep in pairs(ply:GetWeapons()) do
 			wep:SetNextPrimaryFire(CurTime() + 99999)
 			wep:SetNextSecondaryFire(CurTime() + 99999)
 		end
+		
 		//Dont draw viewmodel
 		ply:DrawViewModel(false)
 		
@@ -86,30 +62,66 @@ function parachute.DeployParachute(ply)
 			umsg.Entity(rag)
 		umsg.End()
 		
-		//Play sound
-		ply:EmitSound(parachute.parasound, 100, 100)
-		
 		ply.parachuteragdoll = rag
-		ply.parachute = para
-		para.parachuteowner = ply
 		rag.parachuteowner = ply
 	end
 end
+concommand.Add("para_ragact", function(ply) parachute.DeployRagdoll(ply) end)
+
+function parachute.DeployParachute(ply)
+	if not IsValid(ply.parachuteragdoll) then
+		parachute.DeployRagdoll(ply)
+	end
+	
+	// Spawn parachute n' shit
+	local para = ents.Create("prop_physics")
+		para:SetModel(parachute.paramodel)
+		para:SetPos(ply.parachuteragdoll:GetPos() + Vector(0,0,170))
+		para:SetAngles(Angle(0,ply:GetAngles().y,0))
+		para:Spawn()
+		para:Activate()
+	
+	para.ropes = {}
+	local rag = ply.parachuteragdoll
+	
+	for i = 0, rag:GetPhysicsObjectCount() do
+		local bone = rag:GetPhysicsObjectNum(i)
+		if IsValid(bone) then
+			bone:SetVelocity(Vector(0,0,0))
+		end
+	end
+	
+	for _,ropetbl in pairs(parachute.ropeanchors) do
+		local bone = rag:TranslateBoneToPhysBone( rag:LookupBone( ropetbl.ragdollbone ) )
+		if bone != -1 then
+			local ent, const = constraint.Rope(para, rag, 0, bone, ropetbl.paravec, ropetbl.ragdollvec, ropetbl.length, 0, 0, 2, "cable/rope", 0)
+			table.insert(para.ropes, ent)
+		end
+	end
+	//No ropes created, fucked up physbones
+	if #para.ropes == 0 then
+		ply:PrintMessage(HUD_PRINTTALK, "An error occured with this player model, try change model in order to spawn the parachute!")
+		SafeRemoveEntity(para)
+		return
+	end
+	
+	//Play sound
+	ply:EmitSound(parachute.parasound, 100, 100)
+	
+	para.parachuteowner = ply
+	ply.parachute = para
+end
 concommand.Add("para_act", function(ply) parachute.DeployParachute(ply) end)
 
-function parachute.RemoveParachute(ply)
+function parachute.RemoveRagdoll(ply)
 	if IsValid(ply.parachuteragdoll) then
+		parachute.RemoveParachute(ply)
 		ply:SetMoveType(MOVETYPE_WALK)
 		ply:SetColor(Color(255,255,255,255))
 		ply:SetRenderMode( 10 )
 		ply:SetPos(ply.parachuteragdoll:GetPos())
 		ply:GetPhysicsObject():SetVelocity(ply.parachuteragdoll:GetPhysicsObject():GetVelocity())
 		
-		if IsValid(ply.parachute) then
-			for _,rope in pairs(ply.parachute.ropes) do
-				SafeRemoveEntity(rope) // Proper removal
-			end
-		end
 		
 		timer.Simple(1,function()
 			for _,wep in pairs(ply:GetWeapons()) do
@@ -117,13 +129,28 @@ function parachute.RemoveParachute(ply)
 				wep:SetNextSecondaryFire(CurTime()+1)
 			end
 		end)
-		ply:DrawViewModel(true)
 		
 		SafeRemoveEntity(ply.parachuteragdoll)
-		SafeRemoveEntity(ply.parachute)
+		
+		ply:DrawViewModel(true)
+		timer.Simple(.1,function()
+			ply:DrawViewModel(true)
+		end)
 		
 		umsg.Start("EndRagCam", ply)
 		umsg.End()
+	end
+end
+
+function parachute.RemoveParachute(ply)
+	if IsValid(ply.parachuteragdoll) then
+		SafeRemoveEntity(ply.parachute)
+		
+		if IsValid(ply.parachute) then
+			for _,rope in pairs(ply.parachute.ropes) do
+				SafeRemoveEntity(rope) // Proper removal
+			end
+		end
 		
 		timer.Simple(.5,function()
 			ply:EmitSound(parachute.unparasound, 100, 100)
@@ -176,8 +203,16 @@ end)
 Remove parachute when mouseclick
 */
 hook.Add("KeyPress", "Parachutes_keypress", function(ply, key)
-	if key == IN_ATTACK and IsValid(ply.parachuteragdoll) then
-		parachute.RemoveParachute(ply)
+	if IsValid(ply.parachuteragdoll) then
+		if key == IN_ATTACK then
+			parachute.RemoveRagdoll(ply)
+		elseif key == IN_ATTACK2 then
+			if IsValid(ply.parachute) then
+				parachute.RemoveParachute(ply)
+			else
+				parachute.DeployParachute(ply)
+			end
+		end
 	end
 end)
 
