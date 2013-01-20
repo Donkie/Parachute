@@ -1,11 +1,11 @@
 "AddonInfo"
 {
-	"name"				"Fire Extinguisher"
+	"name"				"Parachute"
 	"version"			"1"
 	"up_date"			""
-	"author_name"			"Donkie, Model by Feihc"
+	"author_name"			"Donkie"
 	"author_email"			""
 	"author_url"			""
-	"info"				"Extinguish fires."
+	"info"				"Parachute."
 	"override"			"0"
 }
