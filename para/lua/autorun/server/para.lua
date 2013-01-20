@@ -55,11 +55,14 @@ function parachute.DeployRagdoll(ply)
 		//Set player to noclip and make him invisiblu
 		ply:SetMoveType(MOVETYPE_NOCLIP)
 		ply:SetColor(Color(255,255,255,0))
-		ply:SetRenderMode( 1 )
-		
+		ply:SetRenderMode( RENDERMODE_TRANSALPHA )
+		/*
+		ply:Spectate(OBS_MODE_CHASE)
+		ply:SpectateEntity(rag)
+		*/
 		//Start 3dperson
 		umsg.Start("StartRagCam", ply)
-			umsg.Entity(rag)
+			umsg.Short(rag:EntIndex())
 		umsg.End()
 		
 		ply.parachuteragdoll = rag
@@ -118,7 +121,7 @@ function parachute.RemoveRagdoll(ply)
 		parachute.RemoveParachute(ply)
 		ply:SetMoveType(MOVETYPE_WALK)
 		ply:SetColor(Color(255,255,255,255))
-		ply:SetRenderMode( 10 )
+		ply:SetRenderMode( RENDERMODE_NORMAL )
 		ply:SetPos(ply.parachuteragdoll:GetPos())
 		ply:GetPhysicsObject():SetVelocity(ply.parachuteragdoll:GetPhysicsObject():GetVelocity())
 		
@@ -136,6 +139,8 @@ function parachute.RemoveRagdoll(ply)
 		timer.Simple(.1,function()
 			ply:DrawViewModel(true)
 		end)
+		
+		ply:UnSpectate()
 		
 		umsg.Start("EndRagCam", ply)
 		umsg.End()
