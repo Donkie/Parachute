@@ -54,12 +54,13 @@ function parachute.DeployRagdoll(ply)
 		
 		//Set player to noclip and make him invisiblu
 		ply:SetMoveType(MOVETYPE_NOCLIP)
-		ply:SetColor(Color(255,255,255,0))
+		
+		//Many many thanks to Ulyssesmod for this snippy!
+		ply:DrawShadow( false )
+		ply:SetMaterial( "models/effects/vol_light001" )
 		ply:SetRenderMode( RENDERMODE_TRANSALPHA )
-		/*
-		ply:Spectate(OBS_MODE_CHASE)
-		ply:SpectateEntity(rag)
-		*/
+		ply:Fire( "alpha", 0, 0 )
+		
 		//Start 3dperson
 		umsg.Start("StartRagCam", ply)
 			umsg.Short(rag:EntIndex())
@@ -75,6 +76,7 @@ function parachute.DeployParachute(ply)
 	if not IsValid(ply.parachuteragdoll) then
 		parachute.DeployRagdoll(ply)
 	end
+	if not IsValid(ply.parachuteragdoll) then return end // Still invalid ragdoll? Fuck this then.
 	
 	// Spawn parachute n' shit
 	local para = ents.Create("prop_physics")
@@ -95,10 +97,13 @@ function parachute.DeployParachute(ply)
 	end
 	
 	for _,ropetbl in pairs(parachute.ropeanchors) do
-		local bone = rag:TranslateBoneToPhysBone( rag:LookupBone( ropetbl.ragdollbone ) )
-		if bone != -1 then
-			local ent, const = constraint.Rope(para, rag, 0, bone, ropetbl.paravec, ropetbl.ragdollvec, ropetbl.length, 0, 0, 2, "cable/rope", 0)
-			table.insert(para.ropes, ent)
+		local ragbone = rag:LookupBone( ropetbl.ragdollbone )
+		if ragbone and ragbone >= 0 then
+			local bone = rag:TranslateBoneToPhysBone( ragbone )
+			if bone != -1 then
+				local ent, const = constraint.Rope(para, rag, 0, bone, ropetbl.paravec, ropetbl.ragdollvec, ropetbl.length, 0, 0, 2, "cable/rope", 0)
+				table.insert(para.ropes, ent)
+			end
 		end
 	end
 	//No ropes created, fucked up physbones
@@ -120,8 +125,6 @@ function parachute.RemoveRagdoll(ply)
 	if IsValid(ply.parachuteragdoll) then
 		parachute.RemoveParachute(ply)
 		ply:SetMoveType(MOVETYPE_WALK)
-		ply:SetColor(Color(255,255,255,255))
-		ply:SetRenderMode( RENDERMODE_NORMAL )
 		ply:SetPos(ply.parachuteragdoll:GetPos())
 		ply:GetPhysicsObject():SetVelocity(ply.parachuteragdoll:GetPhysicsObject():GetVelocity())
 		
@@ -140,7 +143,11 @@ function parachute.RemoveRagdoll(ply)
 			ply:DrawViewModel(true)
 		end)
 		
-		ply:UnSpectate()
+		//Many many thanks to Ulyssesmod for this snippy!
+		ply:DrawShadow( true )
+		ply:SetMaterial( "" )
+		ply:SetRenderMode( RENDERMODE_NORMAL )
+		ply:Fire( "alpha", 255, 0 )
 		
 		umsg.Start("EndRagCam", ply)
 		umsg.End()
@@ -186,6 +193,11 @@ end)
 
 // If the ragdoll gets attacked, let the player take the damage!
 hook.Add("EntityTakeDamage", "Parachutes_enttakedmg", function(targ, dmginfo)
+	if not dmginfo then
+		MsgN("Stop running a outdated version of gibmod!")
+		return
+	end
+	
 	local attacker = dmginfo:GetAttacker()
 	local inf = dmginfo:GetInflictor()
 	
