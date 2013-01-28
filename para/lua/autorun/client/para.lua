@@ -16,7 +16,7 @@ hook.Add("CalcView", "Parachutes_calcview", function( _, pos, ang, fov )
 	local rag = Entity(ply.CurRagCamTargInd)
 	//print("b1: "..tostring(IsValid( ply.CurRagCamTarg )).." b2: "..tostring(ply:GetViewEntity() == ply))
 	if IsValid( rag ) and ply:GetViewEntity() == ply then
-		pos = rag:GetPos() - ply:GetAimVector()*dist
+		pos = rag:GetPos() - (ply:GetAimVector()*dist)
 		ang = (rag:GetPos() - pos):Angle()
 		
 		local tbl = {}
