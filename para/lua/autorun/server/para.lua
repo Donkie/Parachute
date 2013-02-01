@@ -1,6 +1,10 @@
 
 if not SERVER then return end
 
+resource.AddFile("models/parachute/chute.mdl")
+resource.AddFile("materials/entities/parachuter.png")
+resource.AddFile("materials/models/parachute/chute.vmt")
+
 AddCSLuaFile("autorun/client/para.lua")
 
 parachute = {}

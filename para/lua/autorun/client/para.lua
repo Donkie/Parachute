@@ -4,17 +4,23 @@ if not CLIENT then return end
 usermessage.Hook("StartRagCam", function( um )
 	local rag = um:ReadShort()
 	LocalPlayer().CurRagCamTargInd = rag
+	LocalPlayer().RagCamOn = true
 end)
 
 usermessage.Hook("EndRagCam", function( )
 	LocalPlayer().CurRagCamTarg = nil
+	LocalPlayer().RagCamOn = false
 end)
 
 local dist = 200
 hook.Add("CalcView", "Parachutes_calcview", function( _, pos, ang, fov )
 	local ply = LocalPlayer()
+	local ragcamon = ply.RagCamOn or false
+	
+	if not ragcamon then return end
+	
 	local rag = Entity(ply.CurRagCamTargInd)
-	//print("b1: "..tostring(IsValid( ply.CurRagCamTarg )).." b2: "..tostring(ply:GetViewEntity() == ply))
+	
 	if IsValid( rag ) and ply:GetViewEntity() == ply then
 		pos = rag:GetPos() - (ply:GetAimVector()*dist)
 		ang = (rag:GetPos() - pos):Angle()
