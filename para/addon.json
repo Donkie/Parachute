@@ -1,0 +1,9 @@
+{
+	"title"		:	"Parachuter",
+	"type"		:	"effects",
+	"tags"		:	[ "realism", "movie" ],
+	"ignore"	:
+	[
+		"*.txt"
+	]
+}
