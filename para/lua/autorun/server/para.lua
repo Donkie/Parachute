@@ -197,17 +197,13 @@ end)
 
 // If the ragdoll gets attacked, let the player take the damage!
 hook.Add("EntityTakeDamage", "Parachutes_enttakedmg", function(targ, dmginfo)
-	if not dmginfo then
-		MsgN("Stop running a outdated version of gibmod!")
-		return
-	end
+	if type(dmginfo) == "Entity" then return end // Gibmod calls this hook with old entitytakedamage parameters, fuck off I tell ya.
 	
 	local attacker = dmginfo:GetAttacker()
 	local inf = dmginfo:GetInflictor()
 	
 	if not godwhilepara:GetBool() then
 		if IsValid(targ.parachuteowner) then
-			print(attacker, inf)
 			targ.parachuteowner:TakeDamage( dmginfo:GetDamage(), attacker, inf )
 		end
 	end
