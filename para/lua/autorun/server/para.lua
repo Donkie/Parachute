@@ -1,5 +1,7 @@
-
 if not SERVER then return end
+
+util.AddNetworkString("StartRagCam")
+util.AddNetworkString("EndRagCam")
 
 resource.AddFile("models/parachute/chute.mdl")
 resource.AddFile("materials/entities/parachuter.png")
@@ -55,6 +57,11 @@ function parachute.DeployRagdoll(ply)
 		
 		//Dont draw viewmodel
 		ply:DrawViewModel(false)
+		ply:DrawWorldModel(false)
+		timer.Simple(.1,function()
+			ply:DrawViewModel(false)
+			ply:DrawWorldModel(false)
+		end)
 		
 		//Set player to noclip and make him invisiblu
 		ply:SetMoveType(MOVETYPE_NOCLIP)
@@ -66,9 +73,12 @@ function parachute.DeployRagdoll(ply)
 		ply:Fire( "alpha", 0, 0 )
 		
 		//Start 3dperson
-		umsg.Start("StartRagCam", ply)
-			umsg.Short(rag:EntIndex())
-		umsg.End()
+		/*umsg.Start("StartRagCam", ply)
+			//umsg.Short(rag:EntIndex())
+		umsg.End()*/
+		net.Start("StartRagCam")
+			net.WriteUInt(rag:EntIndex(), 32)
+		net.Send(ply)
 		
 		ply.parachuteragdoll = rag
 		rag.parachuteowner = ply
@@ -143,8 +153,10 @@ function parachute.RemoveRagdoll(ply)
 		SafeRemoveEntity(ply.parachuteragdoll)
 		
 		ply:DrawViewModel(true)
+		ply:DrawWorldModel(true)
 		timer.Simple(.1,function()
 			ply:DrawViewModel(true)
+			ply:DrawWorldModel(true)
 		end)
 		
 		//Many many thanks to Ulyssesmod for this snippy!
@@ -153,8 +165,8 @@ function parachute.RemoveRagdoll(ply)
 		ply:SetRenderMode( RENDERMODE_NORMAL )
 		ply:Fire( "alpha", 255, 0 )
 		
-		umsg.Start("EndRagCam", ply)
-		umsg.End()
+		net.Start("EndRagCam")
+		net.Send(ply)
 	end
 end
 
@@ -173,6 +185,10 @@ function parachute.RemoveParachute(ply)
 		end)
 	end
 end
+
+hook.Add("SetupMove", "Parachutes_SetupMove", function(ply, md)
+	if IsValid(ply.parachuteragdoll) then md:SetOrigin(ply.parachuteragdoll:GetPos()) end
+end)
 
 local speed = 700
 hook.Add("Think", "Parachutes_think", function()
@@ -197,7 +213,7 @@ end)
 
 // If the ragdoll gets attacked, let the player take the damage!
 hook.Add("EntityTakeDamage", "Parachutes_enttakedmg", function(targ, dmginfo)
-	if type(dmginfo) == "Entity" then return end // Gibmod calls this hook with old entitytakedamage parameters, fuck off I tell ya.
+	if not dmginfo or type(dmginfo) == "Entity" then return end // Gibmod calls this hook with old entitytakedamage parameters, fuck off I tell ya.
 	
 	local attacker = dmginfo:GetAttacker()
 	local inf = dmginfo:GetInflictor()
@@ -261,8 +277,10 @@ hook.Add("PlayerDeath", "Parachutes_plydead", function(ply)
 		ply:SetRenderMode( 10 )
 		SafeRemoveEntity(ply.parachuteragdoll)
 		SafeRemoveEntity(ply.parachute)
-		umsg.Start("EndRagCam", ply)
-		umsg.End()
+		/*umsg.Start("EndRagCam", ply)
+		umsg.End()*/
+		net.Start("EndRagCam")
+		net.Send(ply)
 	end
 end)
 
